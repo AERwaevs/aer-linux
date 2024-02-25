@@ -10,11 +10,11 @@ set( LINUX_INC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/inc )
 set( LINUX_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src )
 
 set( LINUX_SOURCE 
-    ${LINUX_SRC_DIR}/LinuxWindow.cpp
+    ${LINUX_SRC_DIR}/XCBWindow.cpp
 )
 
 set( LINUX_HEADER 
-    ${LINUX_INC_DIR}/Graphics/LinuxWindow.h
+    ${LINUX_INC_DIR}/Graphics/XCBWindow.h
     ${LINUX_INC_DIR}/Input/LinuxInput.h
 )
 
