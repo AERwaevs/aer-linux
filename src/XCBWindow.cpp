@@ -45,7 +45,7 @@ struct atom_request_t
     {
         if( _connection )
         {
-            if( auto* reply = xcb_intern_atom_reply( _connection, _cookie, nullptr ) )
+            if( auto reply = xcb_intern_atom_reply( _connection, _cookie, nullptr ) )
             {
                 _atom = reply->atom;
                 free( reply );
@@ -114,7 +114,7 @@ struct motif_hints_t
 bool getWindowGeometry( xcb_connection_t* connection, xcb_window_t window, int& x, int& y, uint32_t& width, uint32_t& height )
 {
     const auto geometry_cookie = xcb_get_geometry( connection, window );
-    if( auto* geometry_reply = xcb_get_geometry_reply( connection, geometry_cookie, nullptr ) )
+    if( auto geometry_reply = xcb_get_geometry_reply( connection, geometry_cookie, nullptr ) )
     {
         x = geometry_reply->x;
         y = geometry_reply->y;
@@ -122,10 +122,10 @@ bool getWindowGeometry( xcb_connection_t* connection, xcb_window_t window, int& 
         height = geometry_reply->height;
 
         const auto tree_cookie = xcb_query_tree( connection, window );
-        if( auto* tree_reply = xcb_query_tree_reply( connection, tree_cookie, nullptr ) )
+        if( auto tree_reply = xcb_query_tree_reply( connection, tree_cookie, nullptr ) )
         {
             const auto trans_cookie = xcb_translate_coordinates( connection, window, tree_reply->parent, x, y );
-            if( auto* trans_reply = xcb_translate_coordinates_reply( connection, trans_cookie, nullptr ) )
+            if( auto trans_reply = xcb_translate_coordinates_reply( connection, trans_cookie, nullptr ) )
             {
                 x = trans_reply->dst_x;
                 y = trans_reply->dst_y;
@@ -229,7 +229,7 @@ XCBWindow::XCBWindow( const WindowProperties& props )
     auto hints = props.borderless ? motif_hints_t::borderless() : motif_hints_t::window();
     change_property( atom_request( "_MOTIF_WM_HINTS" ), XCB_ATOM_WM_HINTS, ATOM_SIZE_32, motif_hints_t::num_fields, &hints );
 
-    while( auto* event = xcb_wait_for_event( _connection ) )
+    while( auto event = xcb_wait_for_event( _connection ) )
     {
         if( _first_xcb_timestamp != 0 ) { free( event ); break; }
 
