@@ -20,7 +20,7 @@ namespace aer::gfx
 
 } // namespace aer::gfx
 
-namespace aer::linux::xcb
+namespace aer::xcb
 {
 
 enum atom_size : uint8_t
@@ -139,10 +139,11 @@ bool getWindowGeometry( xcb_connection_t* connection, xcb_window_t window, int& 
     return false;
 }
 
-} // namespace aer::linux::xcb
+} // namespace aer::xcb
 
 namespace aer::linux
 {
+using namespace aer::xcb;
 
 enum : uint8_t { SERVER_USER_MASK = 0x80 };
 
@@ -151,8 +152,6 @@ XCBWindow::XCBWindow( const WindowProperties& props )
     _first_xcb_timestamp( 0 ),
     _first_xcb_time_point( clock::now() )
 {
-    using namespace aer::linux::xcb;
-
     int screenNum( props.screenNum );
     const auto display = !_properties.display.empty()
                        ? _properties.display.c_str()
