@@ -268,11 +268,8 @@ XCBWindow::~XCBWindow()
     
 bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
 {
-    xcb_generic_event_t* event = nullptr;
-    int i = 0;
-    while( ( event = xcb_poll_for_event( _connection ) ) )
+    while( auto event = xcb_poll_for_event( _connection ) )
     {
-        ++i;
         switch( auto response_type = event->response_type & ~SERVER_USER_MASK )
         {
             //-----------------------------------------------------------------------------------//
