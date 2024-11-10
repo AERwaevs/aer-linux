@@ -1,5 +1,10 @@
 #include <Graphics/XCBWindow.h>
+
+#include <Input/MouseCodes.h>
+#include <Input/KeyCodes.h>
+
 #include <Events/WindowEvents.h>
+#include <Events/KeyEvents.h>
 #include <Events/MouseEvents.h>
 
 #include <cstring>
@@ -139,6 +144,96 @@ bool getWindowGeometry( xcb_connection_t* connection, xcb_window_t window, int& 
     return false;
 }
 
+struct keyboard_map : Object
+{
+    using code_mod_pair = std::pair<uint16_t, uint16_t>;
+    using code_map      = std::map<code_mod_pair, key::symbol>;
+    
+
+    keyboard_map( xcb_connection_t* connection )
+    {
+        auto setup = xcb_get_setup( connection );
+        auto min_keycode = setup->min_keycode;
+        auto max_keycode = setup->max_keycode;
+        auto cookie = xcb_get_keyboard_mapping( connection, min_keycode, max_keycode - min_keycode + 1 );
+
+        if( auto reply = xcb_get_keyboard_mapping_reply( connection, cookie, nullptr ) )
+        {
+            auto keysyms = xcb_get_keyboard_mapping_keysyms( reply );
+            auto length = xcb_get_keyboard_mapping_keysyms_length( reply );
+            auto keysyms_per_keycode = reply->keysyms_per_keycode;
+
+            for( int i = 0; i < length; i += keysyms_per_keycode )
+            {
+                auto keysym = &keysyms[i];
+                auto keycode = min_keycode + i / keysyms_per_keycode;
+                for( int j = 0; j < keysyms_per_keycode; ++j )
+                {
+                    if( keysym[j] != 0 ) _keymap[{ keycode, j }] = keysym[j];
+                }
+            }
+            free( reply );
+        } 
+    }
+
+    key_symbol symbol( uint16_t keycode, uint16_t modifier = 0 )
+    {
+        auto itr = _keymap.find( { keycode, modifier } );
+        if( itr == _keymap.end() ) return KEY_Undefined;
+        
+        auto base_key = itr->second;
+        if( modifier == 0 ) return static_cast<key_symbol>( base_key );
+
+        uint16_t index = 0;
+        bool shift = (modifier & key::MOD_Shift) != 0;
+        bool numpad = base_key >= KEY_KP_Space && base_key <= KEY_KP_Divide;
+
+        if( numpad )
+        {
+            bool numlock = (modifier & key::MOD_NumLock) != 0;
+            index = numlock && !shift ? 1 : 0;
+        }
+        else
+        {
+            bool capslock = (modifier & key::MOD_CapsLock) != 0;
+            index = capslock && shift ? 1 : 0;
+        }
+        if( index == 0 ) return static_cast<key_symbol>( base_key );
+        if( itr = _keymap.find( { keycode, index } ); itr != _keymap.end() ) return static_cast<key_symbol>( itr->second );
+        else return KEY_Undefined;
+    }
+
+    key::mod mod( key::symbol symbol, uint16_t modifier, bool pressed )
+    {
+        uint16_t mask{ 0 };
+        if( symbol >= KEY_Shift_L && symbol <= KEY_Hyper_R )
+        {
+            switch( symbol )
+            {
+                case KEY_Shift_L:
+                case KEY_Shift_R:   mask = XCB_KEY_BUT_MASK_SHIFT; break;
+                case KEY_Control_L:
+                case KEY_Control_R: mask = XCB_KEY_BUT_MASK_CONTROL; break;
+                case KEY_Alt_L:
+                case KEY_Alt_R:     mask = XCB_KEY_BUT_MASK_MOD_1; break;
+                case KEY_Meta_L:
+                case KEY_Meta_R:    mask = XCB_KEY_BUT_MASK_MOD_2; break;
+                case KEY_Hyper_L:
+                case KEY_Hyper_R:   mask = XCB_KEY_BUT_MASK_MOD_3; break;
+                case KEY_Super_L:
+                case KEY_Super_R:   mask = XCB_KEY_BUT_MASK_MOD_4; break;
+                default: break;
+            }
+        }
+        pressed ? modifier |= mask : modifier &= ~mask;
+        return key::mod{ modifier };
+    }
+
+protected:
+    code_map _keymap;
+    uint16_t _modmask{ 0XFF };
+};
+
 } // namespace aer::xcb
 
 namespace aer::linux
@@ -150,22 +245,37 @@ enum : uint8_t { SERVER_USER_MASK = 0x80 };
 XCBWindow::XCBWindow( const WindowProperties& props )
 :   _properties( props ),
     _first_xcb_timestamp( 0 ),
-    _first_xcb_time_point( clock::now() )
-{
-    int screenNum( props.screenNum );
-    const auto display = !_properties.display.empty()
-                       ? _properties.display.c_str()
-                       : nullptr;
-
-    _connection = props.systemConnection.has_value()
-                ? std::any_cast<xcb_connection_t*>( props.systemConnection )
-                : xcb_connect( display, &screenNum );
-
-    if( xcb_connection_has_error( _connection ) )
+    _first_xcb_time_point( clock::now() ),
+    _connection( [&] -> xcb_connection_t*
     {
-        xcb_disconnect( _connection );
+        const auto display = !_properties.display.empty()
+                           ? _properties.display.c_str()
+                           : nullptr;
+
+        auto connection = props.systemConnection.has_value()
+                        ? std::any_cast<xcb_connection_t*>( props.systemConnection )
+                        : xcb_connect( display, &_properties.screenNum );
+
+        if( xcb_connection_has_error( connection ) == 0 ) return connection;
+        else xcb_disconnect( connection );
         AE_FATAL( "Failed to establish xcb connection" );
-    };
+    }())
+{
+//    int screenNum( props.screenNum );
+//    const auto display = !_properties.display.empty()
+//                       ? _properties.display.c_str()
+//                       : nullptr;
+//
+//    _connection = props.systemConnection.has_value()
+//                ? std::any_cast<xcb_connection_t*>( props.systemConnection )
+//                : xcb_connect( display, &screenNum );
+//
+//    if( xcb_connection_has_error( _connection ) )
+//    {
+//        xcb_disconnect( _connection );
+//        AE_FATAL( "Failed to establish xcb connection" );
+//    };
+    int screenNum( props.screenNum );
 
     _wmProtocols = atom_request_t( _connection, "WM_PROTOCOLS" );
     _wmDeleteWindow = atom_request_t( _connection, "WM_DELETE_WINDOW" );
@@ -268,6 +378,8 @@ XCBWindow::~XCBWindow()
     
 bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
 {
+    static keyboard_map keymap( _connection );
+
     while( auto event = xcb_poll_for_event( _connection ) )
     {
         switch( auto response_type = event->response_type & ~SERVER_USER_MASK )
@@ -319,6 +431,24 @@ bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
             }
             case XCB_FOCUS_IN: { _events.emplace_back( new WindowFocusEvent( this ) ); break; }
             case XCB_FOCUS_OUT: { _events.emplace_back( new WindowUnfocusEvent( this ) ); break; }
+            case XCB_KEY_PRESS:
+            {
+                auto key_press    = reinterpret_cast<xcb_key_press_event_t*>( event );
+                auto key          = keymap.symbol( key_press->detail );
+                auto modified_key = keymap.symbol( key_press->detail, key_press->state );
+                auto mod          = keymap.mod( key, key_press->state, true );
+                _events.emplace_back( new KeyDownEvent( this, key, modified_key, mod ) );
+                break;
+            }
+            case XCB_KEY_RELEASE:
+            {
+                auto key_release  = reinterpret_cast<xcb_key_release_event_t*>( event );
+                auto key          = keymap.symbol( key_release->detail );
+                auto modified_key = keymap.symbol( key_release->detail, key_release->state );
+                auto mod          = keymap.mod( key, key_release->state, false );
+                _events.emplace_back( new KeyUpEvent( this, key, modified_key, mod ) );
+                break;
+            }
         default:
             AE_WARN( "Unhandled event: %d", static_cast<int>( response_type ) );
             break;
