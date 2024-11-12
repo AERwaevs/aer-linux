@@ -10,21 +10,6 @@
 #include <cstring>
 #include <thread>
 
-namespace aer::gfx
-{
-    ref_ptr<Window> Window::create( const WindowProperties& props )
-    {
-        return ref_ptr<linux::XCBWindow>( new linux::XCBWindow( { props } ) );
-    }
-
-    template<>
-    linux::Window_t Window::native()
-    {
-        return static_cast<linux::XCBWindow*>( this )->native();
-    };
-
-} // namespace aer::gfx
-
 namespace aer::xcb
 {
 
@@ -243,7 +228,7 @@ using namespace aer::xcb;
 enum : uint8_t { SERVER_USER_MASK = 0x80 };
 
 XCBWindow::XCBWindow( const WindowProperties& props )
-:   _properties( props ),
+:   Window( props ),
     _first_xcb_timestamp( 0 ),
     _first_xcb_time_point( clock::now() ),
     _connection( [&] -> xcb_connection_t*
@@ -456,7 +441,7 @@ bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
 
     }
 
-    return aer::gfx::Window::PollEvents( events, clear_unhandled );
+    return aer::Window::PollEvents( events, clear_unhandled );
 }
 
 } // namespace aer::linux

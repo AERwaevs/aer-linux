@@ -37,7 +37,7 @@ target_link_libraries( linux
     PRIVATE
         base
         input
-        graphics_interface
+        graphics
         PkgConfig::xcb
 )
 
