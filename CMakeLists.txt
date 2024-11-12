@@ -8,7 +8,7 @@ set( CMAKE_CXX_EXTENSIONS        OFF )
 # dependencies ------------------------------------------------------------------------------------
 find_package( PkgConfig REQUIRED )
 pkg_check_modules( xcb REQUIRED IMPORTED_TARGET xcb )
-# aer::linux --------------------------------------------------------------------------------------
+# aer --------------------------------------------------------------------------------------
 set( LINUX_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib )
 set( LINUX_INC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/inc )
 set( LINUX_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src )
@@ -41,4 +41,4 @@ target_link_libraries( linux
         PkgConfig::xcb
 )
 
-add_library( aer::linux ALIAS linux )
+add_library( aer ALIAS linux )

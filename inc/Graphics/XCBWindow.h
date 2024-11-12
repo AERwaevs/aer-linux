@@ -5,7 +5,7 @@
 
 #include <xcb/xcb.h>
 
-namespace aer::linux
+namespace aer
 {
 
 class XCBWindow : public Window
@@ -26,13 +26,13 @@ protected:
     clock::time_point   _first_xcb_time_point;
 };
 
-} // namespace aer::linux
+} // namespace aer
 
 namespace aer
 {
     ref_ptr<Window> createWindow( const WindowProperties& props )
     {
-        return ref_ptr<Window>( new linux::XCBWindow( { props } ) );
+        return ref_ptr<Window>( new XCBWindow( { props } ) );
     }
 
 } // namespace aer

@@ -1,8 +1,8 @@
 #pragma once
 
-namespace aer::linux
+namespace aer
 {
     
 
 
-} // namespace aer::linux
+} // namespace aer

@@ -221,7 +221,7 @@ protected:
 
 } // namespace aer::xcb
 
-namespace aer::linux
+namespace aer
 {
 using namespace aer::xcb;
 
@@ -444,4 +444,4 @@ bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
     return aer::Window::PollEvents( events, clear_unhandled );
 }
 
-} // namespace aer::linux
+} // namespace aer
