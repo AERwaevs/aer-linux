@@ -41,4 +41,4 @@ target_link_libraries( linux
         PkgConfig::xcb
 )
 
-add_library( aer ALIAS linux )
+add_library( aer::linux ALIAS linux )
