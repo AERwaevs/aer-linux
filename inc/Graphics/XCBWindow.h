@@ -1,8 +1,6 @@
 #pragma once
 
 #include <Base/Event.h>
-
-#include <Graphics/API.h>
 #include <Graphics/Window.h>
 
 #include <xcb/xcb.h>
