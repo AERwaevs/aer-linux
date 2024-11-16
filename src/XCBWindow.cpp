@@ -256,7 +256,8 @@ XCBWindow::XCBWindow( const WindowProperties& props )
         for( int i = 0; i < screenNum; ++i ) xcb_screen_next( &screen_iterator );
         return screen_iterator.data;
     }()),
-    _window( props.nativeWindow.has_value() ? std::any_cast<xcb_window_t>( props.nativeWindow ) : xcb_generate_id( _connection ) )
+    _window( props.nativeWindow.has_value() ? std::any_cast<xcb_window_t>( props.nativeWindow ) : xcb_generate_id( _connection ) ),
+    _window_delete_protocol( atom_request_t( _connection, "WM_DELETE_WINDOW" ) )
 {
     const auto atom_request = [&]( const char* atom_name ) { return atom_request_t( _connection, atom_name ); };
     const auto change_property = [&]( xcb_atom_t atom, xcb_atom_enum_t type, uint8_t format, uint32_t data_len, const void* data )
@@ -270,7 +271,6 @@ XCBWindow::XCBWindow( const WindowProperties& props )
                                 | XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE
                                 | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION;
     const uint32_t value_list[] = { _screen->black_pixel, XCB_GRAVITY_NORTH_WEST, 0, event_mask };
-    const auto delete_window    = atom_request( "WM_DELETE_WINDOW" );
     const auto hints            = props.borderless ? motif_hints_t::borderless() : motif_hints_t::window();
     const auto state            = atom_request( "_NET_WM_STATE_FULLSCREEN" );
 
@@ -286,7 +286,7 @@ XCBWindow::XCBWindow( const WindowProperties& props )
 
     change_property( XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, ATOM_SIZE_8, props.windowClass.size(), props.windowClass.c_str() );
     change_property( XCB_ATOM_WM_NAME, XCB_ATOM_STRING, ATOM_SIZE_8, props.name.size(), props.name.c_str() );
-    change_property( atom_request( "WM_PROTOCOLS" ), XCB_ATOM_ATOM, ATOM_SIZE_32, 1, &delete_window );
+    change_property( atom_request( "WM_PROTOCOLS" ), XCB_ATOM_ATOM, ATOM_SIZE_32, 1, &_window_delete_protocol );
     change_property( atom_request( "_MOTIF_WM_HINTS" ), XCB_ATOM_WM_HINTS, ATOM_SIZE_32, motif_hints_t::num_fields, &hints );
     if( props.fullscreen ) change_property( atom_request( "_NET_WM_STATE" ), XCB_ATOM_ATOM, ATOM_SIZE_32, 1, &state );
 
@@ -340,7 +340,7 @@ bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
             case XCB_CLIENT_MESSAGE:
             {
                 auto client_message = reinterpret_cast<xcb_client_message_event_t*>( event );
-                if( client_message->data.data32[0] == _wmDeleteWindow )
+                if( client_message->data.data32[0] == _window_delete_protocol )
                 {
                     _events.emplace_back( new WindowCloseEvent( this ) );
                 }
