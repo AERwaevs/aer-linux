@@ -244,52 +244,35 @@ XCBWindow::XCBWindow( const WindowProperties& props )
         if( xcb_connection_has_error( connection ) == 0 ) return connection;
         else xcb_disconnect( connection );
         AE_FATAL( "Failed to establish xcb connection" );
-    }())
+    }()),
+    _screen( [&] -> xcb_screen_t*
+    {
+        const auto setup = xcb_get_setup( _connection );
+        const auto screenCount = xcb_setup_roots_length( setup );
+        
+        AE_WARN_IF( props.screenNum >= screenCount, "Requested screen %d, only %d screens available", props.screenNum, screenCount );
+        const auto screenNum = props.screenNum < screenCount ? props.screenNum : 0;
+        auto screen_iterator = xcb_setup_roots_iterator( setup );
+        for( int i = 0; i < screenNum; ++i ) xcb_screen_next( &screen_iterator );
+        return screen_iterator.data;
+    }()),
+    _window( props.nativeWindow.has_value() ? std::any_cast<xcb_window_t>( props.nativeWindow ) : xcb_generate_id( _connection ) )
 {
-//    int screenNum( props.screenNum );
-//    const auto display = !_properties.display.empty()
-//                       ? _properties.display.c_str()
-//                       : nullptr;
-//
-//    _connection = props.systemConnection.has_value()
-//                ? std::any_cast<xcb_connection_t*>( props.systemConnection )
-//                : xcb_connect( display, &screenNum );
-//
-//    if( xcb_connection_has_error( _connection ) )
-//    {
-//        xcb_disconnect( _connection );
-//        AE_FATAL( "Failed to establish xcb connection" );
-//    };
-    int screenNum( props.screenNum );
+    const auto atom_request = [&]( const char* atom_name ) { return atom_request_t( _connection, atom_name ); };
+    const auto change_property = [&]( xcb_atom_t atom, xcb_atom_enum_t type, uint8_t format, uint32_t data_len, const void* data )
+    {
+        return xcb_change_property( _connection, XCB_PROP_MODE_REPLACE, _window, atom, type, format, data_len, data );
+    };
 
-    _wmProtocols = atom_request_t( _connection, "WM_PROTOCOLS" );
-    _wmDeleteWindow = atom_request_t( _connection, "WM_DELETE_WINDOW" );
-
-    _window = props.nativeWindow.has_value()
-            ? std::any_cast<xcb_window_t>( props.nativeWindow )
-            : xcb_generate_id( _connection );
-
-    const auto setup = xcb_get_setup( _connection );
-    const auto screenCount = xcb_setup_roots_length( setup );
-
-    AE_WARN_IF( props.screenNum >= screenCount, "Requested screen %d, only %d screens available", props.screenNum, screenCount );
-    screenNum = props.screenNum < screenCount ? screenNum : 0;
-    
-    auto screen_iterator = xcb_setup_roots_iterator( setup );
-    for( int i = 0; i < screenNum; ++i ) xcb_screen_next( &screen_iterator );
-    _screen = screen_iterator.data;
-
-    const xcb_window_t   parent         = _screen->root;
-    const uint8_t        depth          = XCB_COPY_FROM_PARENT;
-    const xcb_visualid_t visual         = XCB_COPY_FROM_PARENT;
-    const uint16_t       border_width   = 0;
-    const uint16_t       window_class   = XCB_WINDOW_CLASS_INPUT_OUTPUT;
-    const uint32_t       value_mask     = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK | XCB_CW_BIT_GRAVITY | XCB_CW_OVERRIDE_REDIRECT;
-    const uint32_t       event_mask     = XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY
-                                        | XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_PROPERTY_CHANGE
-                                        | XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE
-                                        | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION;
-    const uint32_t       value_list[]   = { _screen->black_pixel, XCB_GRAVITY_NORTH_WEST, 0, event_mask };
+    const uint32_t value_mask   = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK | XCB_CW_BIT_GRAVITY | XCB_CW_OVERRIDE_REDIRECT;
+    const uint32_t event_mask   = XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY
+                                | XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_PROPERTY_CHANGE
+                                | XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE
+                                | XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION;
+    const uint32_t value_list[] = { _screen->black_pixel, XCB_GRAVITY_NORTH_WEST, 0, event_mask };
+    const auto delete_window    = atom_request( "WM_DELETE_WINDOW" );
+    const auto hints            = props.borderless ? motif_hints_t::borderless() : motif_hints_t::window();
+    const auto state            = atom_request( "_NET_WM_STATE_FULLSCREEN" );
 
     xcb_create_window
     ( 
@@ -298,30 +281,14 @@ XCBWindow::XCBWindow( const WindowProperties& props )
         props.fullscreen ? 0 : props.posy,
         props.fullscreen ? _screen->width_in_pixels : props.width,
         props.fullscreen ? _screen->height_in_pixels : props.height,
-        border_width, XCB_WINDOW_CLASS_INPUT_OUTPUT, _screen->root_visual, value_mask, value_list
+        0, XCB_WINDOW_CLASS_INPUT_OUTPUT, _screen->root_visual, value_mask, value_list
     );
 
-    const auto atom_request = [&]( const char* atom_name ) { return atom_request_t( _connection, atom_name ); };
-    const auto change_property = [&]( xcb_atom_t atom, xcb_atom_enum_t type, uint8_t format, uint32_t data_len, const void* data )
-    {
-        return xcb_change_property( _connection, XCB_PROP_MODE_REPLACE, _window, atom, type, format, data_len, data );
-    };
-
-    // window class, title, protocols
     change_property( XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, ATOM_SIZE_8, props.windowClass.size(), props.windowClass.c_str() );
     change_property( XCB_ATOM_WM_NAME, XCB_ATOM_STRING, ATOM_SIZE_8, props.name.size(), props.name.c_str() );
-    change_property( _wmProtocols, XCB_ATOM_ATOM, ATOM_SIZE_32, 1, &_wmDeleteWindow );
-
-    // window manager hints
-    if( props.fullscreen )
-    {
-        xcb_atom_t atoms[]{ atom_request( "_NET_WM_STATE_FULLSCREEN" ) };
-        change_property( atom_request( "_NET_WM_STATE" ), XCB_ATOM_ATOM, ATOM_SIZE_32, 1, atoms );
-    }
-
-    // window decorations
-    auto hints = props.borderless ? motif_hints_t::borderless() : motif_hints_t::window();
+    change_property( atom_request( "WM_PROTOCOLS" ), XCB_ATOM_ATOM, ATOM_SIZE_32, 1, &delete_window );
     change_property( atom_request( "_MOTIF_WM_HINTS" ), XCB_ATOM_WM_HINTS, ATOM_SIZE_32, motif_hints_t::num_fields, &hints );
+    if( props.fullscreen ) change_property( atom_request( "_NET_WM_STATE" ), XCB_ATOM_ATOM, ATOM_SIZE_32, 1, &state );
 
     while( auto event = xcb_wait_for_event( _connection ) )
     {
@@ -337,10 +304,7 @@ XCBWindow::XCBWindow( const WindowProperties& props )
     }
 
     xcb_map_window( _connection, _window );
-    xcb_flush( _connection );
-
-    std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-
+    if( xcb_flush( _connection ) <= 0 ) AE_WARN( "Failed to flush xcb connection" );
     if( auto geometry_reply = xcb_get_geometry_reply( _connection, xcb_get_geometry( _connection, _window ), nullptr ) )
     {
         _properties.posx = geometry_reply->x;
