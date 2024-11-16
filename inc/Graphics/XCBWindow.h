@@ -20,8 +20,6 @@ protected:
     xcb_connection_t*   _connection = nullptr;
     xcb_screen_t*       _screen     = nullptr;
     xcb_window_t        _window{};
-    xcb_atom_t          _wmProtocols{};
-    xcb_atom_t          _wmDeleteWindow{};
     xcb_timestamp_t     _first_xcb_timestamp = 0;
     clock::time_point   _first_xcb_time_point;
 };
