@@ -349,23 +349,19 @@ bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
             case XCB_CONFIGURE_NOTIFY:
             {
                 auto configure = reinterpret_cast<xcb_configure_notify_event_t*>( event );
-                int32_t x = configure->x, 
-                        y = configure->y;
-
-                uint32_t width = configure->width, 
-                         height = configure->height;
-
+                int32_t  x(configure->x), y(configure->y);
+                uint32_t width(configure->width), height(configure->height);
                 xcb::getWindowGeometry( _connection, _window, x, y, width, height );
 
-                bool previousResizeEventIsEqual = false;
-                for( auto prev : events ) if( auto wre = dynamic_cast<WindowResizeEvent*>( prev.get() ) )
+                bool previousConfigureEventIsEqual = false;
+                for( auto prev : events ) if( auto cwe = dynamic_cast<WindowConfigureEvent*>( prev.get() ) )
                 {
-                    previousResizeEventIsEqual = ( wre->width() == width && wre->height() == height );
+                    previousConfigureEventIsEqual = ( cwe->width == width && cwe->height == height );
                 }
 
-                if( !previousResizeEventIsEqual )
+                if( !previousConfigureEventIsEqual )
                 {
-                    _events.emplace_back( new WindowResizeEvent( this, width, height ) );
+                    _events.emplace_back( new WindowConfigureEvent( this, x, y, width, height ) );
                     _properties.width = width;
                     _properties.height = height;
                 }
