@@ -337,6 +337,7 @@ bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
             //                                   WINDOW                                          //
             //-----------------------------------------------------------------------------------//
             case XCB_DESTROY_NOTIFY: { _events.emplace_back( new WindowCloseEvent( this ) ); break; }
+            case XCB_EXPOSE: { _events.emplace_back( new WindowExposeEvent( this ) ); break; }
             case XCB_CLIENT_MESSAGE:
             {
                 auto client_message = reinterpret_cast<xcb_client_message_event_t*>( event );
