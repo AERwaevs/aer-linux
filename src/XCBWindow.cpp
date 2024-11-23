@@ -369,14 +369,11 @@ bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
 
                 break;
             }
-            case XCB_MOTION_NOTIFY:
-            {
-                auto motion = reinterpret_cast<xcb_motion_notify_event_t*>( event );
-                if( motion->same_screen ) _events.emplace_back( new MouseMoveEvent( this, motion->event_x, motion->event_y ) );
-                break;
-            }
             case XCB_FOCUS_IN: { _events.emplace_back( new WindowFocusEvent( this ) ); break; }
             case XCB_FOCUS_OUT: { _events.emplace_back( new WindowUnfocusEvent( this ) ); break; }
+            //-----------------------------------------------------------------------------------//
+            //                                   KEYBOARD                                        //
+            //-----------------------------------------------------------------------------------//
             case XCB_KEY_PRESS:
             {
                 auto key_press    = reinterpret_cast<xcb_key_press_event_t*>( event );
@@ -395,11 +392,66 @@ bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
                 _events.emplace_back( new KeyUpEvent( this, key, modified_key, mod ) );
                 break;
             }
-        default:
-            AE_WARN( "Unhandled event: %d", static_cast<int>( response_type ) );
-            break;
-        }
+            //-----------------------------------------------------------------------------------//
+            //                                   MOUSE                                           //
+            //-----------------------------------------------------------------------------------//
+            case XCB_BUTTON_PRESS:
+            {
+                auto button_press = reinterpret_cast<xcb_button_press_event_t*>( event );
+                if( button_press->same_screen )
+                {
+                    auto button = MOUSE_None;
+                    switch( button_press->detail )
+                    {
+                        case 1: button = MOUSE_Left; break;
+                        case 2: button = MOUSE_Middle; break;
+                        case 3: button = MOUSE_Right; break;
+                        case 4: _events.emplace_back( new MouseScrollEvent( this, button_press->event_x, button_press->event_y, 1 ) ); break;
+                        case 5: _events.emplace_back( new MouseScrollEvent( this, button_press->event_x, button_press->event_y, -1 ) ); break;
+                        case 8: button = MOUSE_Backward; break;
+                        case 9: button = MOUSE_Forward; break;
+                        default: break;
+                    }
 
+                    if( button != MOUSE_None ) _events.emplace_back( new MouseDownEvent( this, button_press->event_x, button_press->event_y, button ) );
+                }
+                break;
+            }
+            case XCB_BUTTON_RELEASE:
+            {
+                auto button_release = reinterpret_cast<xcb_button_release_event_t*>( event );
+                if( button_release->same_screen && button_release-> detail != 4 && button_release->detail != 5 )
+                {
+                    auto button = MOUSE_None;
+                    switch( button_release->detail )
+                    {
+                        case 1: button = MOUSE_Left; break;
+                        case 2: button = MOUSE_Middle; break;
+                        case 3: button = MOUSE_Right; break;
+                        case 4: _events.emplace_back( new MouseScrollEvent( this, button_release->event_x, button_release->event_y, 1 ) ); break;
+                        case 5: _events.emplace_back( new MouseScrollEvent( this, button_release->event_x, button_release->event_y, -1 ) ); break;
+                        case 8: button = MOUSE_Backward; break;
+                        case 9: button = MOUSE_Forward; break;
+                        default: break;
+                    }
+
+                    if( button != MOUSE_None ) _events.emplace_back( new MouseUpEvent( this, button_release->event_x, button_release->event_y, button ) );
+                }
+                break;
+            }
+            case XCB_MOTION_NOTIFY:
+            {
+                auto motion = reinterpret_cast<xcb_motion_notify_event_t*>( event );
+                if( motion->same_screen ) _events.emplace_back( new MouseMoveEvent( this, motion->event_x, motion->event_y ) );
+                break;
+            }
+            //-----------------------------------------------------------------------------------//
+            //                                   OTHER                                           //
+            //-----------------------------------------------------------------------------------//
+            case XCB_GE_GENERIC: AE_INFO( "Generic event: %d", response_type ); break;
+            default:            AE_WARN( "Unhandled event: %d", static_cast<int>( response_type ) ); break;
+        }
+        free( event );
     }
 
     return aer::Window::PollEvents( events, clear_unhandled );
