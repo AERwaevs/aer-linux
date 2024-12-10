@@ -243,14 +243,14 @@ XCBWindow::XCBWindow( const WindowProperties& props )
 
         if( xcb_connection_has_error( connection ) == 0 ) return connection;
         else xcb_disconnect( connection );
-        AE_FATAL( "Failed to establish xcb connection" );
+        ABORT_F( "Failed to establish xcb connection" );
     }()),
     _screen( [&] -> xcb_screen_t*
     {
         const auto setup = xcb_get_setup( _connection );
         const auto screenCount = xcb_setup_roots_length( setup );
         
-        AE_WARN_IF( props.screenNum >= screenCount, "Requested screen %d, only %d screens available", props.screenNum, screenCount );
+        LOG_IF_F( WARNING, props.screenNum >= screenCount, "Requested screen %d, only %d screens available", props.screenNum, screenCount );
         const auto screenNum = props.screenNum < screenCount ? props.screenNum : 0;
         auto screen_iterator = xcb_setup_roots_iterator( setup );
         for( int i = 0; i < screenNum; ++i ) xcb_screen_next( &screen_iterator );
@@ -304,7 +304,7 @@ XCBWindow::XCBWindow( const WindowProperties& props )
     }
 
     xcb_map_window( _connection, _window );
-    if( xcb_flush( _connection ) <= 0 ) AE_WARN( "Failed to flush xcb connection" );
+    if( xcb_flush( _connection ) <= 0 ) LOG_F( WARNING, "Failed to flush xcb connection" );
     if( auto geometry_reply = xcb_get_geometry_reply( _connection, xcb_get_geometry( _connection, _window ), nullptr ) )
     {
         _properties.posx = geometry_reply->x;
@@ -448,8 +448,8 @@ bool XCBWindow::PollEvents( Events& events, bool clear_unhandled )
             //-----------------------------------------------------------------------------------//
             //                                   OTHER                                           //
             //-----------------------------------------------------------------------------------//
-            case XCB_GE_GENERIC: AE_INFO( "Generic event: %d", response_type ); break;
-            default:            AE_WARN( "Unhandled event: %d", static_cast<int>( response_type ) ); break;
+            case XCB_GE_GENERIC: LOG_F( INFO, "Generic event: %d", response_type ); break;
+            default:            LOG_F( WARNING, "Unhandled event: %d", static_cast<int>( response_type ) ); break;
         }
         free( event );
     }

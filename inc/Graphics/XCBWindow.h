@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Base/Base.h>
 #include <Base/Event.h>
 #include <Graphics/Window.h>
 
