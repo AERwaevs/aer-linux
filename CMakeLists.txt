@@ -41,4 +41,11 @@ target_link_libraries( linux
         PkgConfig::xcb
 )
 
+set_target_properties( linux PROPERTIES
+    CXX_STANDARD                    23
+    CXX_STANDARD_REQUIRED           ON
+    CXX_EXTENSIONS                  OFF
+    CMAKE_POSITION_INDEPENDENT_CODE ON
+)
+
 add_library( aer::linux ALIAS linux )
