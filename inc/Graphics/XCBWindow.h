@@ -26,9 +26,4 @@ protected:
     clock::time_point   _first_xcb_time_point;
 };
 
-ref_ptr<Window> createWindow( const WindowProperties& props )
-{
-    return ref_ptr<Window>( new XCBWindow( { props } ) );
-}
-
 } // namespace aer

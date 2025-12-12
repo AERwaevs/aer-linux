@@ -225,6 +225,11 @@ namespace aer
 {
 using namespace aer::xcb;
 
+ref_ptr<Window> createWindow( const WindowProperties& props )
+{
+    return ref_ptr<Window>( new XCBWindow( { props } ) );
+}
+
 enum : uint8_t { SERVER_USER_MASK = 0x80 };
 
 XCBWindow::XCBWindow( const WindowProperties& props )
